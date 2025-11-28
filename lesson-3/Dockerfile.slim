@@ -1,0 +1,30 @@
+FROM python:3.9-slim AS builder
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PYTHONPATH=/opt/deps
+
+WORKDIR /tmp/build
+
+COPY lesson-3/requirements.txt .
+
+RUN python -m pip install --upgrade pip \
+    && pip install --no-cache-dir --target=/opt/deps -r requirements.txt
+
+COPY lesson-3/export_model.py .
+RUN python export_model.py --output /tmp/build/model.pt
+
+FROM python:3.9-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
+WORKDIR /app
+
+COPY --from=builder /opt/deps /usr/local/lib/python3.9/site-packages/
+COPY --from=builder /tmp/build/model.pt .
+COPY lesson-3/inference.py ./
+
+ENTRYPOINT ["python", "inference.py"]
+CMD ["--help"]

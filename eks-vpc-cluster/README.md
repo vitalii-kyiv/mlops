@@ -1,0 +1,111 @@
+## Проєкт: VPC + EKS (Terraform, модульна структура)
+
+Цей проєкт демонструє **модульну структуру Terraform** для реальної роботи з AWS:
+
+- **модуль `vpc/`** створює VPC та сабнети за допомогою `terraform-aws-modules/vpc/aws`;
+- **модуль `eks/`** створює EKS кластер та дві node group-и (умовно CPU та GPU) за допомогою `terraform-aws-modules/eks/aws`;
+- модуль `eks/` отримує дані про VPC через **`data.terraform_remote_state`**;
+- у корені є `main.tf`, який імпортує обидва модулі.
+
+Усі параметри для доступу до AWS (bucket, таблиця DynamoDB, регіон…) вказані **як умовні placeholer-и**. Для реального запуску їх потрібно замінити на власні значення.
+
+---
+
+### Структура проєкту
+
+eks-vpc-cluster/
+- `main.tf` — імпорт модулів `vpc` та `eks`;
+- `variables.tf` — вхідні змінні на рівні кореня (AWS region, AZs);
+- `outputs.tf` — основні вихідні параметри (VPC, EKS);
+- `terraform.tf` — загальні налаштування Terraform і provider;
+- `backend.tf` — приклад конфігурації S3 backend для root state;
+- `vpc/` — модуль VPC;
+- `eks/` — модуль EKS;
+- `README.md` — ця інструкція.
+
+---
+
+### Попередні вимоги
+
+- встановлений **Terraform >= 1.5**;
+- встановлений **AWS CLI** з налаштованими креденшелами (`aws configure`);
+- встановлений **kubectl**;
+- створений **S3 bucket** та (опціонально) **DynamoDB таблиця** для Terraform state/locks.
+
+---
+
+### Налаштування placeholder-ів
+
+1. Відкрийте файли:
+   - `backend.tf` (у корені, а також за потреби в `vpc/backend.tf` та `eks/backend.tf`);
+   - `eks/main.tf` (дані для `data "terraform_remote_state" "vpc"`).
+2. Замініть:
+   - `my-terraform-state-bucket-placeholder` → на назву вашого S3 bucket;
+   - `my-terraform-locks-placeholder` → на назву DynamoDB таблиці (якщо використовуєте locks);
+   - `us-east-1` → на ваш регіон (наприклад, `eu-central-1`);
+   - `eks-vpc-cluster/vpc/terraform.tfstate` → на реальний key для VPC state.
+
+---
+
+### Варіант 1: окремі стани для VPC та EKS (рекомендовано для навчання)
+
+1. **Створення VPC**
+
+```bash
+cd eks-vpc-cluster/vpc
+terraform init
+terraform apply
+```
+
+Після `apply` в S3 з'явиться state з output-ами VPC.
+
+2. **Створення EKS з використанням `terraform_remote_state`**
+
+Переконайтеся, що в `eks/variables.tf` / `eks/main.tf` вказані правильні:
+- `vpc_state_bucket`
+- `vpc_state_key`
+- `vpc_state_region`
+
+Потім:
+
+```bash
+cd ../eks
+terraform init
+terraform apply
+```
+
+---
+
+### Варіант 2: запуск із кореня (єдиний state)
+
+> Для більшої простоти можна запускати Terraform з кореня `eks-vpc-cluster/`. У цьому випадку `vpc` та `eks` використовуються як внутрішні модулі, а backend — один для всього проєкту (див. `eks-vpc-cluster/backend.tf`).
+
+```bash
+cd eks-vpc-cluster
+terraform init
+terraform apply
+```
+
+> Зверніть увагу: навіть при єдиному state модуль `eks` все одно містить приклад використання `terraform_remote_state`, який ви можете адаптувати під окремий VPC state.
+
+---
+
+### Перевірка доступу до кластера після `terraform apply`
+
+Після успішного застосування конфігурацій EKS:
+
+```bash
+aws eks --region <your-region> update-kubeconfig --name <your-cluster-name>
+```
+
+У цьому проєкті `<your-cluster-name>` за умовчанням відповідає `local.cluster_name` з `main.tf` (наприклад, `demo-eks-vpc-cluster-cluster`).
+
+Далі перевірте ноди:
+
+```bash
+kubectl get nodes
+```
+
+Ви маєте побачити 2 node group-и (умовні CPU та GPU), обидві на базі **Free Tier** інстансів `t2.micro` / `t3.micro` (у конфігурації використано `t3.micro`).
+
+

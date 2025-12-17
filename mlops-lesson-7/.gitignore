@@ -1,0 +1,17 @@
+# ===== Terraform =====
+.terraform/
+.terraform.lock.hcl
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+terraform-argocd.tfstate
+
+
+# ===== Python =====
+venv/
+*/venv/
+
+
+# ===== MacOS Junk =====
+.DS_Store
+*/.DS_Store

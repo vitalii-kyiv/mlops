@@ -1,0 +1,85 @@
+replicaCount: 2
+
+image:
+  repository: your-registry/aiops-quality
+  pullPolicy: IfNotPresent
+  tag: "latest"
+
+imagePullSecrets: []
+nameOverride: ""
+fullnameOverride: ""
+
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+podAnnotations:
+  prometheus.io/scrape: "true"
+  prometheus.io/port: "8000"
+  prometheus.io/path: "/metrics"
+
+podSecurityContext: {}
+
+securityContext: {}
+
+service:
+  type: ClusterIP
+  port: 80
+  targetPort: 8000
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: aiops-quality.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 250m
+    memory: 256Mi
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+
+nodeSelector: {}
+
+tolerations: []
+
+affinity: {}
+
+env:
+  MODEL_PATH: "/app/models/model.pkl"
+  DRIFT_DETECTOR_PATH: "/app/models/drift_detector.pkl"
+  REFERENCE_DATA_PATH: "/app/models/reference_data.pkl"
+
+volumes:
+  - name: models
+    emptyDir: {}
+
+volumeMounts:
+  - name: models
+    mountPath: /app/models
+
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  scrapeTimeout: 10s
+  path: /metrics
+
+logging:
+  enabled: true
+  loki:
+    enabled: true
+
